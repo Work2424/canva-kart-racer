@@ -3,28 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Minimal Kart Racer</title>
+  <title>Canvas Kart Racer</title>
   <style>
     html, body {
       margin: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #050b14;
+      background: #040b12;
       font-family: Arial, sans-serif;
     }
 
-    #game {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-    }
-
-    canvas {
+    #gameCanvas {
       display: block;
       width: 100%;
       height: 100%;
-      background: #07111a;
+      background: #07131c;
     }
 
     #hud {
@@ -32,44 +26,30 @@
       inset: 0;
       pointer-events: none;
       color: white;
-      text-shadow: 0 2px 10px rgba(0,0,0,.65);
+      text-shadow: 0 2px 10px rgba(0,0,0,.7);
       user-select: none;
-      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.08em;
+      font-weight: 700;
     }
 
-    .box {
+    .panel {
       position: absolute;
-      background: rgba(15,20,30,0.45);
+      background: rgba(14, 20, 30, 0.5);
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 12px;
-      padding: 12px 14px;
+      padding: 10px 14px;
       min-width: 120px;
     }
 
-    #lapBox {
-      top: 18px;
-      left: 18px;
-    }
-
-    #posBox {
-      top: 108px;
-      left: 18px;
-      min-width: 140px;
-    }
-
-    #speedBox {
-      top: 18px;
-      right: 18px;
-      min-width: 150px;
-      text-align: right;
-    }
+    #lapBox { top: 18px; left: 18px; }
+    #posBox { top: 108px; left: 18px; min-width: 140px; }
+    #speedBox { top: 18px; right: 18px; text-align: right; min-width: 150px; }
 
     .label {
       display: block;
       font-size: 11px;
-      opacity: 0.8;
+      opacity: 0.82;
     }
 
     .value {
@@ -84,26 +64,22 @@
       left: 50%;
       bottom: 20px;
       transform: translateX(-50%);
-      background: rgba(15,20,30,0.5);
+      background: rgba(14,20,30,0.5);
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 14px;
       padding: 12px 18px;
+      min-width: 142px;
       text-align: center;
-      min-width: 140px;
     }
 
-    #itemEmoji {
-      display: block;
-      font-size: 32px;
-      margin-bottom: 4px;
-    }
+    #itemEmoji { display: block; font-size: 32px; margin-bottom: 4px; }
 
     #message {
       position: absolute;
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.38);
+      background: rgba(0,0,0,0.4);
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 12px;
       padding: 16px 24px;
@@ -113,28 +89,24 @@
       white-space: nowrap;
     }
 
-    #message.show {
-      opacity: 1;
-    }
+    #message.show { opacity: 1; }
   </style>
-
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js"></script>
 </head>
 <body>
-  <div id="game"></div>
+  <canvas id="gameCanvas"></canvas>
 
   <div id="hud">
-    <div id="lapBox" class="box">
+    <div id="lapBox" class="panel">
       <span class="label">Lap</span>
       <span id="lapText" class="value">Lap 1/3</span>
     </div>
 
-    <div id="posBox" class="box">
+    <div id="posBox" class="panel">
       <span class="label">Position</span>
       <span id="posText" class="value">1st</span>
     </div>
 
-    <div id="speedBox" class="box">
+    <div id="speedBox" class="panel">
       <span class="label">Speed</span>
       <span id="speedText" class="value">0</span>
     </div>
@@ -148,74 +120,8 @@
   </div>
 
   <script>
-    const mount = document.getElementById('game');
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    mount.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x78b9ff);
-
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
-    camera.position.set(0, 10, 18);
-
-    const ambient = new THREE.AmbientLight(0xffffff, 0.8);
-    scene.add(ambient);
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
-    dirLight.position.set(30, 35, 20);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.set(1024, 1024);
-    dirLight.shadow.camera.left = -80;
-    dirLight.shadow.camera.right = 80;
-    dirLight.shadow.camera.top = 80;
-    dirLight.shadow.camera.bottom = -80;
-    scene.add(dirLight);
-
-    const splinePoints = [
-      new THREE.Vector3(-10, 0, -36),
-      new THREE.Vector3(12, 0.2, -42),
-      new THREE.Vector3(38, 0.3, -24),
-      new THREE.Vector3(46, 0.4, 8),
-      new THREE.Vector3(28, 0.2, 35),
-      new THREE.Vector3(0, 0.1, 46),
-      new THREE.Vector3(-24, 0.2, 40),
-      new THREE.Vector3(-50, 0.3, 18),
-      new THREE.Vector3(-54, 0.2, -16),
-      new THREE.Vector3(-36, 0.3, -35),
-      new THREE.Vector3(-18, 0.2, -45),
-      new THREE.Vector3(-6, 0.1, -38)
-    ];
-
-    const trackCurve = new THREE.CatmullRomCurve3(splinePoints, true, 'catmullrom', 0.2);
-    const trackRadius = 8.5;
-
-    const trackGeometry = new THREE.TubeGeometry(trackCurve, 420, trackRadius, 16, true);
-    const trackMaterial = new THREE.MeshStandardMaterial({
-      color: 0x363d49,
-      roughness: 0.95,
-      metalness: 0.1
-    });
-    const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
-    trackMesh.receiveShadow = true;
-    scene.add(trackMesh);
-
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(220, 220),
-      new THREE.MeshStandardMaterial({ color: 0x2ea44f, roughness: 1 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.2;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
-    const skyGeo = new THREE.SphereGeometry(500, 32, 32);
-    const skyMat = new THREE.MeshBasicMaterial({ color: 0x88c9ff, side: THREE.BackSide });
-    const sky = new THREE.Mesh(skyGeo, skyMat);
-    scene.add(sky);
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
 
     const lapText = document.getElementById('lapText');
     const posText = document.getElementById('posText');
@@ -224,516 +130,348 @@
     const itemText = document.getElementById('itemText');
     const messageEl = document.getElementById('message');
 
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
     const keys = {};
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       keys[k] = true;
       if (e.code === 'Space') {
         e.preventDefault();
-        if (!raceState.raceOver) usePlayerItem();
+        usePlayerItem();
       }
     });
     window.addEventListener('keyup', (e) => {
-      keys[e.key.toLowerCase()] = false;
+      const k = e.key.toLowerCase();
+      keys[k] = false;
     });
 
-    function createKart(color, x, z, name) {
-      const group = new THREE.Group();
+    const trackPoints = [
+      { x: 170, y: 120 },
+      { x: 430, y: 90 },
+      { x: 700, y: 150 },
+      { x: 860, y: 360 },
+      { x: 760, y: 650 },
+      { x: 500, y: 760 },
+      { x: 220, y: 710 },
+      { x: 120, y: 470 },
+      { x: 170, y: 120 }
+    ];
 
-      const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.2 });
-      const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 4.4), bodyMat);
-      chassis.position.y = 1.05;
-      chassis.castShadow = true;
-      group.add(chassis);
+    const roadRadius = 78;
+    const centerPoints = trackPoints.slice(0, trackPoints.length - 1);
 
-      const cabinMat = new THREE.MeshStandardMaterial({ color: 0xeaf7ff, roughness: 0.4, metalness: 0.2 });
-      const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.8, 2.0), cabinMat);
-      cabin.position.set(0, 1.7, -0.2);
-      cabin.castShadow = true;
-      group.add(cabin);
-
-      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
-      const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.6, 18);
-      const wheelPositions = [
-        [-1.2, 0.55, 1.5],
-        [1.2, 0.55, 1.5],
-        [-1.2, 0.55, -1.5],
-        [1.2, 0.55, -1.5]
-      ];
-
-      const wheels = [];
-      wheelPositions.forEach(([wx, wy, wz]) => {
-        const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-        wheel.rotation.z = Math.PI / 2;
-        wheel.position.set(wx, wy, wz);
-        wheel.castShadow = true;
-        wheel.receiveShadow = true;
-        group.add(wheel);
-        wheels.push(wheel);
-      });
-
-      group.position.set(x, 0, z);
-      scene.add(group);
-
-      return {
-        name,
-        group,
-        wheels,
-        position: group.position,
-        velocity: 0,
-        acceleration: 0.15,
-        maxSpeed: 5.0,
-        braking: 0.3,
-        friction: 0.05,
-        turnSpeed: 0.04,
-        angle: 0,
-        item: null,
-        itemTimer: 0,
-        radius: 3,
-        botTargetIndex: 0,
-        totalWaypoints: 0,
-        completedLaps: 0,
-        raceFinished: false,
-        spinTimer: 0,
-        lastWaypoint: 0,
-        botTimer: Math.random() * 0.5,
-        isPlayer: name === 'player',
-        lastSafePosition: new THREE.Vector3(x, 0, z)
-      };
+    function dist(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
     }
 
-    const player = createKart(0x47b3ff, 0, 0, 'player');
-    const botA = createKart(0xff7a59, 12, -34, 'botA');
-    const botB = createKart(0x8fdc5d, -10, 30, 'botB');
-    const botC = createKart(0xffd166, 24, 12, 'botC');
-    const karts = [player, botA, botB, botC];
-
-    const raceState = {
-      raceOver: false,
-      winner: null
-    };
-
-    function clamp(v, min, max) {
-      return Math.min(max, Math.max(min, v));
+    function wrapAngle(a) {
+      while (a > Math.PI) a -= Math.PI * 2;
+      while (a < -Math.PI) a += Math.PI * 2;
+      return a;
     }
 
-    function nearestTrackPoint(pos) {
-      let best = null;
-      let bestDistSq = Infinity;
-
-      for (let i = 0; i <= 600; i++) {
-        const t = i / 600;
-        const p = trackCurve.getPointAt(t);
-        const dx = p.x - pos.x;
-        const dz = p.z - pos.z;
-        const d2 = dx * dx + dz * dz;
-        if (d2 < bestDistSq) {
-          bestDistSq = d2;
-          best = p;
+    function nearestTrackPoint(x, y) {
+      let best = { x: trackPoints[0].x, y: trackPoints[0].y };
+      let bestD = Infinity;
+      for (let i = 0; i < trackPoints.length - 1; i++) {
+        const a = trackPoints[i];
+        const b = trackPoints[i + 1];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const lenSq = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / lenSq));
+        const px = a.x + dx * t;
+        const py = a.y + dy * t;
+        const d = Math.hypot(x - px, y - py);
+        if (d < bestD) {
+          bestD = d;
+          best = { x: px, y: py };
         }
       }
       return best;
     }
 
-    function getTrackProgress(pos) {
-      let bestT = 0;
-      let bestDist = Infinity;
-
-      for (let i = 0; i <= 600; i++) {
-        const t = i / 600;
-        const p = trackCurve.getPointAt(t);
-        const dx = p.x - pos.x;
-        const dz = p.z - pos.z;
-        const d2 = dx * dx + dz * dz;
-        if (d2 < bestDist) {
-          bestDist = d2;
-          bestT = t;
+    function nearestTrackIndex(x, y) {
+      let bestIndex = 0;
+      let bestD = Infinity;
+      for (let i = 0; i < centerPoints.length; i++) {
+        const p = centerPoints[i];
+        const d = dist({ x, y }, p);
+        if (d < bestD) {
+          bestD = d;
+          bestIndex = i;
         }
       }
-      return bestT;
+      return bestIndex;
     }
 
-    function updateLapProgress(kart) {
-      const t = getTrackProgress(kart.position);
-      const idx = Math.floor(t * splinePoints.length) % splinePoints.length;
-
-      if (idx === 0 && kart.lastWaypoint > splinePoints.length - 3) {
-        if (kart.totalWaypoints >= splinePoints.length) {
-          kart.completedLaps += 1;
-          kart.totalWaypoints = 0;
-          if (kart.completedLaps >= 3) {
-            kart.raceFinished = true;
-          }
-        }
-      }
-
-      kart.lastWaypoint = idx;
-      kart.totalWaypoints = Math.max(kart.totalWaypoints, idx);
-    }
-
-    function updateRaceStandings() {
-      const ordered = [...karts].sort((a, b) => {
-        if (b.completedLaps !== a.completedLaps) return b.completedLaps - a.completedLaps;
-        return b.totalWaypoints - a.totalWaypoints;
-      });
-
-      ordered.forEach((kart, idx) => {
-        kart.place = idx + 1;
-      });
-
-      if (!raceState.raceOver) {
-        const winner = ordered[0];
-        if (winner && winner.completedLaps >= 3) {
-          raceState.raceOver = true;
-          raceState.winner = winner;
-          messageEl.textContent = 'Winner: ' + winner.name.toUpperCase();
-          messageEl.classList.add('show');
-        }
-      }
-    }
-
-    function setKartYaw(kart, yaw) {
-      kart.angle = yaw;
-      kart.group.rotation.y = yaw;
-    }
-
-    function applyPlayerControls(delta) {
-      if (raceState.raceOver) return;
-
-      const left = keys['arrowleft'] || keys['a'];
-      const right = keys['arrowright'] || keys['d'];
-      const forward = keys['arrowup'] || keys['w'];
-      const reverse = keys['arrowdown'] || keys['s'];
-
-      const steer = (left ? -1 : 0) + (right ? 1 : 0);
-
-      if (steer !== 0) {
-        player.angle += steer * player.turnSpeed * (0.8 + Math.abs(player.velocity) * 0.25);
-      }
-
-      if (forward) {
-        player.velocity += player.acceleration;
-      }
-      if (reverse) {
-        player.velocity -= player.braking * 0.8;
-      }
-
-      player.velocity *= 1 - player.friction;
-      player.velocity = clamp(player.velocity, -2.5, player.maxSpeed);
-
-      if (Math.abs(player.velocity) < 0.02) player.velocity = 0;
-
-      const moveX = Math.sin(player.angle) * player.velocity;
-      const moveZ = Math.cos(player.angle) * player.velocity;
-      player.position.x += moveX * delta * 60;
-      player.position.z += moveZ * delta * 60;
-
-      const closest = nearestTrackPoint(player.position);
-      if (closest) {
-        const d = player.position.distanceTo(closest);
-        if (d > trackRadius + 1.4) {
-          const dir = closest.clone().sub(player.position).normalize();
-          player.position.addScaledVector(dir, (d - trackRadius) * 0.7);
-          player.velocity *= 0.5;
-        }
-      }
-
-      player.lastSafePosition.copy(player.position);
-      setKartYaw(player, player.angle);
-      player.group.position.set(player.position.x, 0, player.position.z);
-    }
-
-    function moveBot(kart, delta) {
-      kart.botTimer -= delta;
-      if (kart.botTimer > 0) return;
-      kart.botTimer = 0.16 + Math.random() * 0.2;
-
-      const target = splinePoints[kart.botTargetIndex % splinePoints.length];
-      const dx = target.x - kart.position.x;
-      const dz = target.z - kart.position.z;
-      const dist = Math.hypot(dx, dz);
-
-      if (dist < 9) {
-        kart.botTargetIndex = (kart.botTargetIndex + 1) % splinePoints.length;
-      }
-
-      const desiredYaw = Math.atan2(dx, dz);
-      const diff = ((desiredYaw - kart.angle + Math.PI) % (Math.PI * 2)) - Math.PI;
-      kart.angle += diff * 0.08;
-
-      kart.velocity += kart.acceleration * 0.75;
-      kart.velocity = clamp(kart.velocity, 0, kart.maxSpeed);
-      kart.velocity *= 1 - kart.friction * 0.8;
-
-      const moveX = Math.sin(kart.angle) * kart.velocity;
-      const moveZ = Math.cos(kart.angle) * kart.velocity;
-      kart.position.x += moveX * delta * 60;
-      kart.position.z += moveZ * delta * 60;
-
-      const closest = nearestTrackPoint(kart.position);
-      if (closest) {
-        const d = kart.position.distanceTo(closest);
-        if (d > trackRadius + 1.5) {
-          const dir = closest.clone().sub(kart.position).normalize();
-          kart.position.addScaledVector(dir, (d - trackRadius) * 0.8);
-          kart.velocity *= 0.5;
-        }
-      }
-
-      setKartYaw(kart, kart.angle);
-      kart.group.position.set(kart.position.x, 0, kart.position.z);
-    }
-
-    const itemBoxes = [];
-    const itemTypes = ['mushroom', 'banana', 'redshell'];
-
-    function createItemBox(pos, kind) {
-      const group = new THREE.Group();
-
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(1.4, 1.4, 1.4),
-        new THREE.MeshStandardMaterial({
-          color: 0xffe066,
-          emissive: 0xffc400,
-          emissiveIntensity: 0.8,
-          transparent: true,
-          opacity: 0.9
-        })
-      );
-      mesh.castShadow = true;
-      group.add(mesh);
-
-      group.position.copy(pos);
-      scene.add(group);
-
+    function makeKart(x, y, color, isPlayer = false) {
       return {
-        group,
-        mesh,
-        active: true,
-        respawn: 0,
-        kind,
-        bob: Math.random() * Math.PI * 2
+        x, y,
+        vx: 0, vy: 0,
+        angle: 0,
+        color,
+        isPlayer,
+        maxSpeed: 4.2,
+        accel: 0.2,
+        friction: 0.045,
+        turnSpeed: 0.06,
+        drift: 0,
+        item: null,
+        itemTimer: 0,
+        lap: 1,
+        lapProgress: 0,
+        lastIndex: 0,
+        completedLaps: 0,
+        spinTimer: 0,
+        radius: 16,
+        boostTimer: 0,
+        shell: null,
+        banana: null
       };
     }
 
-    const boxPositions = [
-      new THREE.Vector3(-8, 1.5, -18),
-      new THREE.Vector3(26, 1.5, -16),
-      new THREE.Vector3(18, 1.5, 22),
-      new THREE.Vector3(-30, 1.5, 14)
+    const player = makeKart(260, 250, '#4ec8ff', true);
+    const botA = makeKart(340, 200, '#ff7d5b');
+    const botB = makeKart(420, 330, '#8adf62');
+    const botC = makeKart(290, 430, '#ffcf45');
+    const karts = [player, botA, botB, botC];
+
+    let raceOver = false;
+
+    const itemSpawns = [
+      { x: 270, y: 340, kind: 'mushroom', active: true },
+      { x: 620, y: 290, kind: 'banana', active: true },
+      { x: 715, y: 500, kind: 'redshell', active: true },
+      { x: 270, y: 610, kind: 'mushroom', active: true }
     ];
 
-    boxPositions.forEach((pos, i) => {
-      itemBoxes.push(createItemBox(pos, itemTypes[i % itemTypes.length]));
-    });
+    const activeBananas = [];
+    const activeShells = [];
 
-    function updateItemBoxes(delta) {
-      itemBoxes.forEach((box) => {
-        if (!box.active) {
-          box.respawn -= delta;
-          if (box.respawn <= 0) {
-            box.active = true;
-            box.group.visible = true;
-            box.mesh.material.opacity = 0.9;
-          }
-          return;
+    function resetItemBox(item) {
+      item.active = true;
+      item.respawn = 0;
+    }
+
+    function updateItems(dt) {
+      for (const it of itemSpawns) {
+        if (!it.active) {
+          it.respawn -= dt;
+          if (it.respawn <= 0) it.active = true;
+          continue;
         }
-
-        box.bob += delta * 2.0;
-        box.group.position.y = 1.5 + Math.sin(box.bob) * 0.5;
-        box.group.rotation.y += delta * 1.5;
 
         for (const kart of karts) {
-          if (kart.position.distanceTo(box.group.position) < 2.3) {
-            box.active = false;
-            box.group.visible = false;
-            box.respawn = 5;
+          if (dist(kart, it) < 26) {
             if (!kart.item) {
-              kart.item = box.kind;
+              kart.item = it.kind;
             }
+            it.active = false;
+            it.respawn = 5;
           }
         }
-      });
-    }
+      }
 
-    const bananas = [];
-    const shells = [];
+      for (let i = activeBananas.length - 1; i >= 0; i--) {
+        const b = activeBananas[i];
+        b.life -= dt;
+        if (b.life <= 0) {
+          activeBananas.splice(i, 1);
+          continue;
+        }
+        for (const kart of karts) {
+          if (kart === b.owner) continue;
+          if (dist(kart, b) < 18) {
+            kart.spinTimer = 1.2;
+            kart.vx = 0; kart.vy = 0;
+            activeBananas.splice(i, 1);
+            break;
+          }
+        }
+      }
 
-    function createBanana(kart) {
-      const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.35, 0.45, 1.5, 12),
-        new THREE.MeshStandardMaterial({ color: 0xf5cf3a, emissive: 0xffca00, emissiveIntensity: 0.3 })
-      );
-      mesh.rotation.z = Math.PI / 2;
-      mesh.position.copy(kart.position).add(new THREE.Vector3(-Math.sin(kart.angle) * 2.4, 0.2, -Math.cos(kart.angle) * 2.4));
-      mesh.castShadow = true;
-      scene.add(mesh);
+      for (let i = activeShells.length - 1; i >= 0; i--) {
+        const s = activeShells[i];
+        s.life -= dt;
+        if (s.life <= 0) {
+          activeShells.splice(i, 1);
+          continue;
+        }
 
-      bananas.push({
-        mesh,
-        owner: kart,
-        active: true,
-        life: 6,
-        radius: 2.0
-      });
-    }
+        const target = [...karts].filter(k => k !== s.owner).sort((a, b) => {
+          return dist(a, s) - dist(b, s);
+        })[0];
 
-    function createShell(kart) {
-      const target = [...karts].filter(k => k !== kart).sort((a, b) => {
-        return a.position.distanceTo(kart.position) - b.position.distanceTo(kart.position);
-      })[0];
+        if (target) {
+          const dx = target.x - s.x;
+          const dy = target.y - s.y;
+          const ang = Math.atan2(dy, dx);
+          s.x += Math.cos(ang) * 4.7 * dt * 60;
+          s.y += Math.sin(ang) * 4.7 * dt * 60;
+        }
 
-      if (!target) return;
-
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.6, 18, 18),
-        new THREE.MeshStandardMaterial({ color: 0xff3d3d, emissive: 0x5c0000, emissiveIntensity: 0.7 })
-      );
-      mesh.position.copy(kart.position);
-      mesh.position.y = 1.1;
-      mesh.castShadow = true;
-      scene.add(mesh);
-
-      shells.push({
-        mesh,
-        owner: kart,
-        target,
-        active: true,
-        life: 6,
-        speed: 0.55
-      });
-    }
-
-    function useItem(kart) {
-      if (!kart.item) return;
-
-      if (kart.item === 'mushroom') {
-        kart.maxSpeed = 5.0 * 1.8;
-        kart.itemTimer = 1.5;
-        kart.item = null;
-      } else if (kart.item === 'banana') {
-        createBanana(kart);
-        kart.item = null;
-      } else if (kart.item === 'redshell') {
-        createShell(kart);
-        kart.item = null;
+        for (const kart of karts) {
+          if (kart === s.owner) continue;
+          if (dist(kart, s) < 18) {
+            kart.spinTimer = 1.5;
+            kart.vx = 0; kart.vy = 0;
+            activeShells.splice(i, 1);
+            break;
+          }
+        }
       }
     }
 
     function usePlayerItem() {
-      useItem(player);
-    }
-
-    function updateItemEffects(delta) {
-      for (const kart of karts) {
-        if (kart.itemTimer > 0) {
-          kart.itemTimer -= delta;
-          if (kart.itemTimer <= 0) {
-            kart.maxSpeed = 5.0;
-          }
-        }
-
-        if (kart.spinTimer > 0) {
-          kart.spinTimer -= delta;
-          kart.group.rotation.y += delta * 20;
-          kart.velocity *= 0.9;
-        }
-      }
-
-      for (let i = bananas.length - 1; i >= 0; i--) {
-        const b = bananas[i];
-        if (!b.active) continue;
-
-        b.life -= delta;
-        if (b.life <= 0) {
-          scene.remove(b.mesh);
-          bananas.splice(i, 1);
-          continue;
-        }
-
-        for (const kart of karts) {
-          if (kart === b.owner) continue;
-          if (kart.position.distanceTo(b.mesh.position) < b.radius) {
-            kart.spinTimer = 1.0;
-            kart.velocity = 0;
-            scene.remove(b.mesh);
-            bananas.splice(i, 1);
-            break;
-          }
-        }
-      }
-
-      for (let i = shells.length - 1; i >= 0; i--) {
-        const s = shells[i];
-        if (!s.active) continue;
-
-        s.life -= delta;
-        if (s.life <= 0) {
-          scene.remove(s.mesh);
-          shells.splice(i, 1);
-          continue;
-        }
-
-        const targetPos = s.target.position.clone();
-        const dir = targetPos.sub(s.mesh.position).normalize();
-        s.mesh.position.addScaledVector(dir, s.speed * 60 * delta);
-        s.mesh.position.y = 1.1;
-
-        for (const kart of karts) {
-          if (kart === s.owner) continue;
-          if (kart.position.distanceTo(s.mesh.position) < 1.7) {
-            kart.spinTimer = 1.2;
-            kart.velocity = 0;
-            scene.remove(s.mesh);
-            shells.splice(i, 1);
-            break;
-          }
-        }
+      if (raceOver || !player.item) return;
+      const item = player.item;
+      if (item === 'mushroom') {
+        player.boostTimer = 1.5;
+        player.maxSpeed = 6.8;
+        player.item = null;
+      } else if (item === 'banana') {
+        activeBananas.push({ x: player.x - Math.cos(player.angle) * 22, y: player.y - Math.sin(player.angle) * 22, life: 6, owner: player });
+        player.item = null;
+      } else if (item === 'redshell') {
+        activeShells.push({ x: player.x, y: player.y, life: 6, owner: player });
+        player.item = null;
       }
     }
 
-    function kartCollisions() {
+    function useBotItem(bot) {
+      if (!bot.item) return;
+      if (bot.item === 'mushroom') {
+        bot.boostTimer = 1.5;
+        bot.maxSpeed = 6.8;
+        bot.item = null;
+      } else if (bot.item === 'banana') {
+        activeBananas.push({ x: bot.x - Math.cos(bot.angle) * 22, y: bot.y - Math.sin(bot.angle) * 22, life: 6, owner: bot });
+        bot.item = null;
+      } else if (bot.item === 'redshell') {
+        activeShells.push({ x: bot.x, y: bot.y, life: 6, owner: bot });
+        bot.item = null;
+      }
+    }
+
+    function updateKartLogic(kart, dt) {
+      if (kart.isPlayer) {
+        const left = keys['arrowleft'] || keys['a'];
+        const right = keys['arrowright'] || keys['d'];
+        const forward = keys['arrowup'] || keys['w'];
+        const backward = keys['arrowdown'] || keys['s'];
+
+        const steer = (left ? -1 : 0) + (right ? 1 : 0);
+        if (steer !== 0) {
+          kart.angle += steer * kart.turnSpeed * 1.2;
+        }
+
+        if (forward) kart.vx += Math.cos(kart.angle) * kart.accel;
+        if (forward) kart.vy += Math.sin(kart.angle) * kart.accel;
+        if (backward) {
+          kart.vx -= Math.cos(kart.angle) * kart.accel * 0.8;
+          kart.vy -= Math.sin(kart.angle) * kart.accel * 0.8;
+        }
+      } else {
+        const targetIndex = nearestTrackIndex(kart.x, kart.y);
+        const target = centerPoints[targetIndex];
+        const ang = Math.atan2(target.y - kart.y, target.x - kart.x);
+        const diff = wrapAngle(ang - kart.angle);
+        kart.angle += diff * 0.08;
+        kart.vx += Math.cos(kart.angle) * kart.accel * 0.8;
+        kart.vy += Math.sin(kart.angle) * kart.accel * 0.8;
+
+        if (Math.random() < 0.005 && !kart.item) {
+          kart.item = ['mushroom', 'banana', 'redshell'][Math.floor(Math.random() * 3)];
+        }
+        if (kart.item && Math.random() < 0.012) {
+          useBotItem(kart);
+        }
+      }
+
+      if (kart.boostTimer > 0) {
+        kart.boostTimer -= dt;
+        if (kart.boostTimer <= 0) kart.maxSpeed = 4.2;
+      }
+
+      if (kart.spinTimer > 0) {
+        kart.spinTimer -= dt;
+        kart.angle += 0.35;
+      }
+
+      const speed = Math.hypot(kart.vx, kart.vy);
+      const maxSpeed = kart.maxSpeed;
+      if (speed > maxSpeed) {
+        const s = maxSpeed / speed;
+        kart.vx *= s;
+        kart.vy *= s;
+      }
+
+      kart.vx *= 1 - kart.friction;
+      kart.vy *= 1 - kart.friction;
+
+      const oldX = kart.x;
+      const oldY = kart.y;
+      kart.x += kart.vx * dt * 60;
+      kart.y += kart.vy * dt * 60;
+
+      const closest = nearestTrackPoint(kart.x, kart.y);
+      const trackDist = dist({ x: kart.x, y: kart.y }, closest);
+      if (trackDist > roadRadius) {
+        kart.x = oldX;
+        kart.y = oldY;
+        kart.vx *= 0.5;
+        kart.vy *= 0.5;
+      }
+
       for (let i = 0; i < karts.length; i++) {
-        for (let j = i + 1; j < karts.length; j++) {
-          const a = karts[i];
-          const b = karts[j];
-          const dx = b.position.x - a.position.x;
-          const dz = b.position.z - a.position.z;
-          const dist = Math.hypot(dx, dz);
-          const minDist = a.radius + b.radius;
-
-          if (dist < minDist) {
-            const nx = dx / (dist || 1);
-            const nz = dz / (dist || 1);
-            const overlap = (minDist - dist) * 0.5;
-
-            a.position.x -= nx * overlap;
-            a.position.z -= nz * overlap;
-            b.position.x += nx * overlap;
-            b.position.z += nz * overlap;
-
-            const impulse = (a.velocity - b.velocity) * 0.35;
-            a.velocity -= impulse;
-            b.velocity += impulse;
-          }
+        const other = karts[i];
+        if (other === kart) continue;
+        const dx = kart.x - other.x;
+        const dy = kart.y - other.y;
+        const d = Math.hypot(dx, dy);
+        if (d < 24) {
+          const nx = dx / (d || 1);
+          const ny = dy / (d || 1);
+          const overlap = (24 - d) * 0.5;
+          kart.x += nx * overlap;
+          kart.y += ny * overlap;
+          other.x -= nx * overlap;
+          other.y -= ny * overlap;
+          kart.vx += nx * 0.3;
+          kart.vy += ny * 0.3;
+          other.vx -= nx * 0.3;
+          other.vy -= ny * 0.3;
         }
       }
+
+      const idx = nearestTrackIndex(kart.x, kart.y);
+      if (idx === 0 && kart.lastIndex > centerPoints.length - 3) {
+        kart.completedLaps += 1;
+        if (kart.completedLaps >= 3) {
+          raceOver = true;
+        }
+      }
+      kart.lastIndex = idx;
     }
 
     function updateHUD() {
-      const lapNumber = Math.min(3, player.completedLaps + 1);
-      lapText.textContent = `Lap ${lapNumber}/3`;
+      lapText.textContent = `Lap ${Math.min(3, player.completedLaps + 1)}/3`;
 
-      const ordered = [...karts].sort((a, b) => {
+      const ranked = [...karts].sort((a, b) => {
         if (b.completedLaps !== a.completedLaps) return b.completedLaps - a.completedLaps;
-        return b.totalWaypoints - a.totalWaypoints;
+        return nearestTrackIndex(b.x, b.y) - nearestTrackIndex(a.x, a.y);
       });
-      const index = ordered.findIndex((k) => k === player);
-      const posTextValue = index + 1;
-      const suffix = posTextValue === 1 ? 'st' : posTextValue === 2 ? 'nd' : posTextValue === 3 ? 'rd' : 'th';
-      posText.textContent = `${posTextValue}${suffix}`;
-
-      speedText.textContent = String(Math.round(Math.abs(player.velocity) * 35));
+      const pIndex = ranked.indexOf(player) + 1;
+      const suffix = pIndex === 1 ? 'st' : pIndex === 2 ? 'nd' : pIndex === 3 ? 'rd' : 'th';
+      posText.textContent = `${pIndex}${suffix}`;
+      speedText.textContent = String(Math.round(Math.hypot(player.vx, player.vy) * 22));
 
       if (player.item) {
         const map = {
@@ -750,100 +488,151 @@
       }
     }
 
-    function updateBotLogic(delta) {
-      moveBot(botA, delta);
-      moveBot(botB, delta);
-      moveBot(botC, delta);
+    function drawGrid() {
+      ctx.fillStyle = '#0d1b22';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      for (const bot of [botA, botB, botC]) {
-        if (!bot.item && Math.random() < 0.01) {
-          bot.item = ['mushroom', 'banana', 'redshell'][Math.floor(Math.random() * 3)];
-        }
+      ctx.fillStyle = '#143226';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        if (bot.item && Math.random() < 0.015) {
-          useItem(bot);
-        }
+      for (let x = 0; x < canvas.width; x += 40) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 40) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
       }
     }
 
-    function resize() {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h, false);
+    function drawTrack() {
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      ctx.beginPath();
+      ctx.moveTo(trackPoints[0].x, trackPoints[0].y);
+      for (let i = 1; i < trackPoints.length; i++) {
+        ctx.lineTo(trackPoints[i].x, trackPoints[i].y);
+      }
+      ctx.closePath();
+
+      ctx.strokeStyle = '#2a343d';
+      ctx.lineWidth = 86;
+      ctx.stroke();
+
+      ctx.strokeStyle = '#4d5966';
+      ctx.lineWidth = 66;
+      ctx.stroke();
+
+      ctx.strokeStyle = '#d8dfe7';
+      ctx.setLineDash([18, 18]);
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
-    window.addEventListener('resize', resize);
-    resize();
-
-    const clock = new THREE.Clock();
-
-    function animate() {
-      const delta = Math.min(clock.getDelta(), 0.033);
-
-      if (!raceState.raceOver) {
-        applyPlayerControls(delta);
-        updateBotLogic(delta);
-        kartCollisions();
-
-        for (const kart of karts) {
-          updateLapProgress(kart);
-
-          const closest = nearestTrackPoint(kart.position);
-          if (closest) {
-            const d = kart.position.distanceTo(closest);
-            if (d > trackRadius + 1.5) {
-              const dir = closest.clone().sub(kart.position).normalize();
-              kart.position.addScaledVector(dir, (d - trackRadius) * 0.7);
-              kart.velocity *= 0.5;
-            }
-          }
-
-          kart.group.position.set(kart.position.x, 0, kart.position.z);
-          kart.group.rotation.y = kart.angle;
-
-          for (const wheel of kart.wheels) {
-            wheel.rotation.x += (kart.velocity * 1.3) * delta * 60;
-          }
-        }
-
-        updateItemEffects(delta);
-        updateItemBoxes(delta);
-        updateRaceStandings();
+    function drawItemBoxes() {
+      for (const item of itemSpawns) {
+        if (!item.active) continue;
+        const pulse = 1 + Math.sin(Date.now() * 0.006 + item.x) * 0.15;
+        ctx.save();
+        ctx.translate(item.x, item.y);
+        ctx.scale(pulse, pulse);
+        ctx.fillStyle = 'rgba(255, 220, 90, 0.95)';
+        ctx.fillRect(-10, -10, 20, 20);
+        ctx.fillStyle = '#f9ffef';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(item.kind === 'mushroom' ? 'M' : item.kind === 'banana' ? 'B' : 'S', 0, 2);
+        ctx.restore();
       }
+    }
 
-      const desired = player.position.clone().add(
-        new THREE.Vector3(
-          -Math.sin(player.angle) * 15,
-          6,
-          -Math.cos(player.angle) * 15
-        )
-      );
-      camera.position.lerp(desired, 0.08);
-      camera.lookAt(player.position.x, 1.5, player.position.z);
+    function drawBananas() {
+      for (const b of activeBananas) {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(Math.PI / 2);
+        ctx.fillStyle = '#ffde4d';
+        ctx.fillRect(-8, -14, 16, 28);
+        ctx.restore();
+      }
+    }
+
+    function drawShells() {
+      for (const s of activeShells) {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff4d4d';
+        ctx.fill();
+      }
+    }
+
+    function drawKart(kart) {
+      ctx.save();
+      ctx.translate(kart.x, kart.y);
+      ctx.rotate(kart.angle);
+
+      ctx.fillStyle = kart.color;
+      ctx.fillRect(-16, -10, 32, 20);
+      ctx.fillStyle = '#dfeeff';
+      ctx.fillRect(-8, -12, 16, 8);
+
+      ctx.fillStyle = '#111';
+      ctx.fillRect(-18, -14, 6, 10);
+      ctx.fillRect(12, -14, 6, 10);
+      ctx.fillRect(-18, 4, 6, 10);
+      ctx.fillRect(12, 4, 6, 10);
+
+      ctx.restore();
+    }
+
+    function draw() {
+      drawGrid();
+      drawTrack();
+      drawItemBoxes();
+      drawBananas();
+      drawShells();
+      drawKart(player);
+      for (const bot of [botA, botB, botC]) drawKart(bot);
+    }
+
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min((now - last) / 1000, 0.032);
+      last = now;
+
+      if (!raceOver) {
+        updateKartLogic(player, dt);
+        updateKartLogic(botA, dt);
+        updateKartLogic(botB, dt);
+        updateKartLogic(botC, dt);
+        updateItems(dt);
+        if (player.completedLaps >= 3) {
+          raceOver = true;
+          messageEl.textContent = 'Winner: PLAYER';
+          messageEl.classList.add('show');
+        }
+      }
 
       updateHUD();
-      renderer.render(scene, camera);
-      requestAnimationFrame(animate);
+      draw();
+      requestAnimationFrame(loop);
     }
 
-    setKartYaw(player, 0);
-    setKartYaw(botA, Math.PI * 0.6);
-    setKartYaw(botB, -Math.PI * 0.7);
-    setKartYaw(botC, Math.PI * 1.2);
+    player.angle = -Math.PI / 2;
+    botA.angle = -0.3;
+    botB.angle = 1.0;
+    botC.angle = 2.0;
 
-    player.position.set(0, 0, 0);
-    botA.position.set(12, 0, -34);
-    botB.position.set(-14, 0, 27);
-    botC.position.set(20, 0, 10);
-
-    player.group.position.copy(player.position);
-    botA.group.position.copy(botA.position);
-    botB.group.position.copy(botB.position);
-    botC.group.position.copy(botC.position);
-
-    requestAnimationFrame(animate);
+    requestAnimationFrame(loop);
   </script>
 </body>
 </html>
