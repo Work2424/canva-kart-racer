@@ -3,640 +3,326 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Canvas Kart Racer</title>
+  <title>3D Cube Avoider</title>
   <style>
+    :root {
+      --bg: #030712;
+      --panel: rgba(15, 23, 42, 0.72);
+      --panel-border: rgba(255,255,255,0.12);
+      --text: #e5edf8;
+      --accent: #8b5cf6;
+      --accent-2: #22d3ee;
+      --danger: #ef4444;
+      --good: #34d399;
+    }
+
+    * { box-sizing: border-box; }
+
     html, body {
       margin: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #040b12;
-      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
     }
 
-    #gameCanvas {
+    body {
+      position: relative;
+    }
+
+    canvas {
       display: block;
       width: 100%;
       height: 100%;
-      background: #07131c;
-      outline: none;
+      background: radial-gradient(circle at top, #0f172a 0%, #020817 55%, #01050b 100%);
     }
 
     #hud {
       position: absolute;
       inset: 0;
       pointer-events: none;
-      color: white;
-      text-shadow: 0 2px 10px rgba(0,0,0,.7);
       user-select: none;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
       font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     .panel {
       position: absolute;
-      background: rgba(14, 20, 30, 0.5);
-      border: 1px solid rgba(255,255,255,0.12);
+      top: 18px;
+      left: 18px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
       border-radius: 12px;
       padding: 10px 14px;
-      min-width: 120px;
+      min-width: 140px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.18);
     }
 
-    #lapBox { top: 18px; left: 18px; }
-    #posBox { top: 108px; left: 18px; min-width: 140px; }
-    #speedBox { top: 18px; right: 18px; text-align: right; min-width: 150px; }
+    .panel.right {
+      left: auto;
+      right: 18px;
+      min-width: 170px;
+      text-align: right;
+    }
 
     .label {
       display: block;
-      font-size: 11px;
-      opacity: 0.82;
+      font-size: 10px;
+      opacity: 0.8;
     }
 
     .value {
       display: block;
-      font-size: 28px;
       margin-top: 4px;
+      font-size: 28px;
       line-height: 1;
     }
-
-    #itemBox {
-      position: absolute;
-      left: 50%;
-      bottom: 20px;
-      transform: translateX(-50%);
-      background: rgba(14,20,30,0.5);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 14px;
-      padding: 12px 18px;
-      min-width: 142px;
-      text-align: center;
-    }
-
-    #itemEmoji { display: block; font-size: 32px; margin-bottom: 4px; }
 
     #message {
       position: absolute;
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.4);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 12px;
-      padding: 16px 24px;
-      font-size: 28px;
+      background: rgba(2, 6, 23, 0.72);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 18px 26px;
+      text-align: center;
+      min-width: 240px;
       opacity: 0;
-      transition: opacity 0.25s ease;
-      white-space: nowrap;
+      transition: opacity 0.2s ease;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.3);
     }
 
-    #message.show { opacity: 1; }
+    #message.show {
+      opacity: 1;
+    }
+
+    #message h2 {
+      margin: 0 0 12px 0;
+      font-size: 26px;
+      color: var(--text);
+    }
+
+    #message button {
+      pointer-events: auto;
+      border: none;
+      outline: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 12px 18px;
+      cursor: pointer;
+      box-shadow: 0 10px 18px rgba(139, 92, 246, 0.35);
+    }
   </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js"></script>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
-
   <div id="hud">
-    <div id="lapBox" class="panel">
-      <span class="label">Lap</span>
-      <span id="lapText" class="value">Lap 1/3</span>
+    <div class="panel">
+      <span class="label">Score</span>
+      <span id="score" class="value">0</span>
     </div>
 
-    <div id="posBox" class="panel">
-      <span class="label">Position</span>
-      <span id="posText" class="value">1st</span>
+    <div class="panel right">
+      <span class="label">Best</span>
+      <span id="best" class="value">0</span>
     </div>
 
-    <div id="speedBox" class="panel">
-      <span class="label">Speed</span>
-      <span id="speedText" class="value">0</span>
+    <div id="message">
+      <h2>Game Over</h2>
+      <button id="restartBtn">Restart</button>
     </div>
-
-    <div id="itemBox">
-      <span id="itemEmoji">❔</span>
-      <span id="itemText">No Item</span>
-    </div>
-
-    <div id="message">Race Over</div>
   </div>
 
   <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-    canvas.tabIndex = 0;
-    canvas.addEventListener('mousedown', () => canvas.focus());
-    canvas.addEventListener('touchstart', () => canvas.focus(), { passive: true });
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x020817);
 
-    const lapText = document.getElementById('lapText');
-    const posText = document.getElementById('posText');
-    const speedText = document.getElementById('speedText');
-    const itemEmoji = document.getElementById('itemEmoji');
-    const itemText = document.getElementById('itemText');
-    const messageEl = document.getElementById('message');
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 5, 16);
 
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(6, 10, 8);
+    scene.add(dirLight);
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(120, 120),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95, metalness: 0.1 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -2.3;
+    scene.add(floor);
+
+    const starGeo = new THREE.BufferGeometry();
+    const starCount = 250;
+    const starPositions = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount * 3; i += 3) {
+      starPositions[i] = (Math.random() - 0.5) * 200;
+      starPositions[i + 1] = (Math.random() - 0.5) * 80 + 10;
+      starPositions[i + 2] = (Math.random() - 0.5) * 200;
     }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    const stars = new THREE.Points(
+      starGeo,
+      new THREE.PointsMaterial({ color: 0xffffff, size: 0.5 })
+    );
+    scene.add(stars);
 
-    const keys = {};
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const message = document.getElementById('message');
+    const restartBtn = document.getElementById('restartBtn');
 
-    function setKeyState(code, pressed) {
-      if (!code) return;
-      const key = code.toLowerCase();
-      keys[key] = pressed;
-    }
+    let score = 0;
+    let best = Number(localStorage.getItem('cubeBest') || 0);
+    bestEl.textContent = String(best);
 
-    window.addEventListener('keydown', (e) => {
-      setKeyState(e.key, true);
-      if (e.code === 'Space') {
-        e.preventDefault();
-        usePlayerItem();
+    const player = new THREE.Group();
+    const playerBody = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 1.5, 1.5),
+      new THREE.MeshStandardMaterial({ color: 0x8b5cf6, emissive: 0x4c1d95, emissiveIntensity: 0.35 })
+    );
+    player.add(playerBody);
+    player.position.set(0, 0, 0);
+    scene.add(player);
+
+    const playerBounds = { left: -8, right: 8, top: 3.5, bottom: -3.5 };
+    let playerVelocityX = 0;
+    let inputX = 0;
+
+    const obstacles = [];
+    let gameOver = false;
+    let lastTime = 0;
+
+    function resetGame() {
+      gameOver = false;
+      score = 0;
+      scoreEl.textContent = '0';
+      message.classList.remove('show');
+      player.position.x = 0;
+      player.position.y = 0;
+      player.position.z = 0;
+      while (obstacles.length) {
+        scene.remove(obstacles.pop());
       }
+    }
+
+    function createObstacle() {
+      const side = Math.random() < 0.5 ? 1 : -1;
+      const x = (Math.random() * 10 - 5) * side;
+      const y = (Math.random() * 6 - 3);
+      const z = -60 - Math.random() * 30;
+
+      const obstacle = new THREE.Mesh(
+        new THREE.BoxGeometry(1.8, 1.8, 1.8),
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color().setHSL(Math.random(), 0.8, 0.6),
+          emissive: 0x220000,
+          emissiveIntensity: 0.3
+        })
+      );
+      obstacle.position.set(x, y, z);
+      scene.add(obstacle);
+      obstacles.push(obstacle);
+    }
+
+    function onKeyChange(event, pressed) {
+      const key = event.key.toLowerCase();
+      if (key === 'arrowleft' || key === 'a') inputX = pressed ? -1 : 0;
+      if (key === 'arrowright' || key === 'd') inputX = pressed ? 1 : 0;
+      if (pressed && (key === ' ' || key === 'spacebar' || event.code === 'Space')) {
+        if (gameOver) resetGame();
+      }
+    }
+
+    window.addEventListener('keydown', (event) => onKeyChange(event, true));
+    window.addEventListener('keyup', (event) => onKeyChange(event, false));
+
+    restartBtn.addEventListener('click', resetGame);
+
+    function updatePlayer(dt) {
+      if (gameOver) return;
+      playerVelocityX = THREE.MathUtils.lerp(playerVelocityX, inputX * 8, 0.12);
+      player.position.x += playerVelocityX * dt;
+      player.position.x = THREE.MathUtils.clamp(player.position.x, playerBounds.left, playerBounds.right);
+      player.rotation.y = playerVelocityX * 0.3;
+    }
+
+    function updateObstacles(dt) {
+      if (gameOver) return;
+
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obs = obstacles[i];
+        obs.position.z += 18 * dt;
+
+        if (obs.position.z > 18) {
+          scene.remove(obs);
+          obstacles.splice(i, 1);
+          score += 1;
+          scoreEl.textContent = String(score);
+          if (score > best) {
+            best = score;
+            bestEl.textContent = String(best);
+            localStorage.setItem('cubeBest', String(best));
+          }
+        }
+      }
+
+      if (Math.random() < 0.035) {
+        createObstacle();
+      }
+
+      for (const obs of obstacles) {
+        const dx = Math.abs(obs.position.x - player.position.x);
+        const dy = Math.abs(obs.position.y - player.position.y);
+        const dz = Math.abs(obs.position.z - player.position.z);
+        if (dx < 1.4 && dy < 1.4 && dz < 1.4) {
+          gameOver = true;
+          message.classList.add('show');
+        }
+      }
+    }
+
+    function animate(ts) {
+      const dt = Math.min((ts - lastTime) / 1000 || 0.016, 0.04);
+      lastTime = ts;
+
+      updatePlayer(dt);
+      updateObstacles(dt);
+      stars.rotation.y += 0.0008;
+      camera.position.x = THREE.MathUtils.lerp(camera.position.x, player.position.x * 0.5, 0.08);
+      camera.position.y = THREE.MathUtils.lerp(camera.position.y, 3.5 + player.position.y * 0.1, 0.08);
+      camera.lookAt(player.position.x, player.position.y, 0);
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    window.addEventListener('keyup', (e) => {
-      setKeyState(e.key, false);
-    });
-
-    const trackPoints = [
-      { x: 170, y: 120 },
-      { x: 430, y: 90 },
-      { x: 700, y: 150 },
-      { x: 860, y: 360 },
-      { x: 760, y: 650 },
-      { x: 500, y: 760 },
-      { x: 220, y: 710 },
-      { x: 120, y: 470 },
-      { x: 170, y: 120 }
-    ];
-
-    const roadRadius = 78;
-    const centerPoints = trackPoints.slice(0, trackPoints.length - 1);
-
-    function dist(a, b) {
-      return Math.hypot(a.x - b.x, a.y - b.y);
-    }
-
-    function wrapAngle(a) {
-      while (a > Math.PI) a -= Math.PI * 2;
-      while (a < -Math.PI) a += Math.PI * 2;
-      return a;
-    }
-
-    function nearestTrackPoint(x, y) {
-      let best = { x: trackPoints[0].x, y: trackPoints[0].y };
-      let bestD = Infinity;
-      for (let i = 0; i < trackPoints.length - 1; i++) {
-        const a = trackPoints[i];
-        const b = trackPoints[i + 1];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const lenSq = dx * dx + dy * dy || 1;
-        const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / lenSq));
-        const px = a.x + dx * t;
-        const py = a.y + dy * t;
-        const d = Math.hypot(x - px, y - py);
-        if (d < bestD) {
-          bestD = d;
-          best = { x: px, y: py };
-        }
-      }
-      return best;
-    }
-
-    function nearestTrackIndex(x, y) {
-      let bestIndex = 0;
-      let bestD = Infinity;
-      for (let i = 0; i < centerPoints.length; i++) {
-        const p = centerPoints[i];
-        const d = dist({ x, y }, p);
-        if (d < bestD) {
-          bestD = d;
-          bestIndex = i;
-        }
-      }
-      return bestIndex;
-    }
-
-    function makeKart(x, y, color, isPlayer = false) {
-      return {
-        x, y,
-        vx: 0, vy: 0,
-        angle: 0,
-        color,
-        isPlayer,
-        maxSpeed: 4.2,
-        accel: 0.2,
-        friction: 0.045,
-        turnSpeed: 0.06,
-        item: null,
-        itemTimer: 0,
-        completedLaps: 0,
-        spinTimer: 0,
-        radius: 16,
-        boostTimer: 0,
-        lastIndex: 0
-      };
-    }
-
-    const player = makeKart(260, 250, '#4ec8ff', true);
-    const botA = makeKart(340, 200, '#ff7d5b');
-    const botB = makeKart(420, 330, '#8adf62');
-    const botC = makeKart(290, 430, '#ffcf45');
-    const karts = [player, botA, botB, botC];
-
-    let raceOver = false;
-
-    const itemSpawns = [
-      { x: 270, y: 340, kind: 'mushroom', active: true },
-      { x: 620, y: 290, kind: 'banana', active: true },
-      { x: 715, y: 500, kind: 'redshell', active: true },
-      { x: 270, y: 610, kind: 'mushroom', active: true }
-    ];
-
-    const activeBananas = [];
-    const activeShells = [];
-
-    function updateItems(dt) {
-      for (const it of itemSpawns) {
-        if (!it.active) {
-          it.respawn -= dt;
-          if (it.respawn <= 0) it.active = true;
-          continue;
-        }
-
-        for (const kart of karts) {
-          if (dist(kart, it) < 26) {
-            if (!kart.item) {
-              kart.item = it.kind;
-            }
-            it.active = false;
-            it.respawn = 5;
-          }
-        }
-      }
-
-      for (let i = activeBananas.length - 1; i >= 0; i--) {
-        const b = activeBananas[i];
-        b.life -= dt;
-        if (b.life <= 0) {
-          activeBananas.splice(i, 1);
-          continue;
-        }
-        for (const kart of karts) {
-          if (kart === b.owner) continue;
-          if (dist(kart, b) < 18) {
-            kart.spinTimer = 1.2;
-            kart.vx = 0; kart.vy = 0;
-            activeBananas.splice(i, 1);
-            break;
-          }
-        }
-      }
-
-      for (let i = activeShells.length - 1; i >= 0; i--) {
-        const s = activeShells[i];
-        s.life -= dt;
-        if (s.life <= 0) {
-          activeShells.splice(i, 1);
-          continue;
-        }
-
-        const target = [...karts].filter(k => k !== s.owner).sort((a, b) => {
-          return dist(a, s) - dist(b, s);
-        })[0];
-
-        if (target) {
-          const dx = target.x - s.x;
-          const dy = target.y - s.y;
-          const ang = Math.atan2(dy, dx);
-          s.x += Math.cos(ang) * 4.7 * dt * 60;
-          s.y += Math.sin(ang) * 4.7 * dt * 60;
-        }
-
-        for (const kart of karts) {
-          if (kart === s.owner) continue;
-          if (dist(kart, s) < 18) {
-            kart.spinTimer = 1.5;
-            kart.vx = 0; kart.vy = 0;
-            activeShells.splice(i, 1);
-            break;
-          }
-        }
-      }
-    }
-
-    function usePlayerItem() {
-      if (raceOver || !player.item) return;
-      const item = player.item;
-      if (item === 'mushroom') {
-        player.boostTimer = 1.5;
-        player.maxSpeed = 6.8;
-        player.item = null;
-      } else if (item === 'banana') {
-        activeBananas.push({ x: player.x - Math.cos(player.angle) * 22, y: player.y - Math.sin(player.angle) * 22, life: 6, owner: player });
-        player.item = null;
-      } else if (item === 'redshell') {
-        activeShells.push({ x: player.x, y: player.y, life: 6, owner: player });
-        player.item = null;
-      }
-    }
-
-    function useBotItem(bot) {
-      if (!bot.item) return;
-      if (bot.item === 'mushroom') {
-        bot.boostTimer = 1.5;
-        bot.maxSpeed = 6.8;
-        bot.item = null;
-      } else if (bot.item === 'banana') {
-        activeBananas.push({ x: bot.x - Math.cos(bot.angle) * 22, y: bot.y - Math.sin(bot.angle) * 22, life: 6, owner: bot });
-        bot.item = null;
-      } else if (bot.item === 'redshell') {
-        activeShells.push({ x: bot.x, y: bot.y, life: 6, owner: bot });
-        bot.item = null;
-      }
-    }
-
-    function updateKartLogic(kart, dt) {
-      if (kart.isPlayer) {
-        const left = keys['arrowleft'] || keys['a'];
-        const right = keys['arrowright'] || keys['d'];
-        const forward = keys['arrowup'] || keys['w'];
-        const backward = keys['arrowdown'] || keys['s'];
-
-        const steer = (left ? -1 : 0) + (right ? 1 : 0);
-        if (steer !== 0) {
-          kart.angle += steer * kart.turnSpeed * 1.2;
-        }
-
-        if (forward) {
-          kart.vx += Math.cos(kart.angle) * kart.accel;
-          kart.vy += Math.sin(kart.angle) * kart.accel;
-        }
-        if (backward) {
-          kart.vx -= Math.cos(kart.angle) * kart.accel * 0.8;
-          kart.vy -= Math.sin(kart.angle) * kart.accel * 0.8;
-        }
-      } else {
-        const targetIndex = nearestTrackIndex(kart.x, kart.y);
-        const target = centerPoints[targetIndex];
-        const ang = Math.atan2(target.y - kart.y, target.x - kart.x);
-        const diff = wrapAngle(ang - kart.angle);
-        kart.angle += diff * 0.08;
-        kart.vx += Math.cos(kart.angle) * kart.accel * 0.8;
-        kart.vy += Math.sin(kart.angle) * kart.accel * 0.8;
-
-        if (Math.random() < 0.005 && !kart.item) {
-          kart.item = ['mushroom', 'banana', 'redshell'][Math.floor(Math.random() * 3)];
-        }
-        if (kart.item && Math.random() < 0.012) {
-          useBotItem(kart);
-        }
-      }
-
-      if (kart.boostTimer > 0) {
-        kart.boostTimer -= dt;
-        if (kart.boostTimer <= 0) kart.maxSpeed = 4.2;
-      }
-
-      if (kart.spinTimer > 0) {
-        kart.spinTimer -= dt;
-        kart.angle += 0.35;
-      }
-
-      const speed = Math.hypot(kart.vx, kart.vy);
-      const maxSpeed = kart.maxSpeed;
-      if (speed > maxSpeed) {
-        const s = maxSpeed / speed;
-        kart.vx *= s;
-        kart.vy *= s;
-      }
-
-      kart.vx *= 1 - kart.friction;
-      kart.vy *= 1 - kart.friction;
-
-      const oldX = kart.x;
-      const oldY = kart.y;
-      kart.x += kart.vx * dt * 60;
-      kart.y += kart.vy * dt * 60;
-
-      const closest = nearestTrackPoint(kart.x, kart.y);
-      const trackDist = dist({ x: kart.x, y: kart.y }, closest);
-      if (trackDist > roadRadius) {
-        kart.x = oldX;
-        kart.y = oldY;
-        kart.vx *= 0.5;
-        kart.vy *= 0.5;
-      }
-
-      for (let i = 0; i < karts.length; i++) {
-        const other = karts[i];
-        if (other === kart) continue;
-        const dx = kart.x - other.x;
-        const dy = kart.y - other.y;
-        const d = Math.hypot(dx, dy);
-        if (d < 24) {
-          const nx = dx / (d || 1);
-          const ny = dy / (d || 1);
-          const overlap = (24 - d) * 0.5;
-          kart.x += nx * overlap;
-          kart.y += ny * overlap;
-          other.x -= nx * overlap;
-          other.y -= ny * overlap;
-          kart.vx += nx * 0.3;
-          kart.vy += ny * 0.3;
-          other.vx -= nx * 0.3;
-          other.vy -= ny * 0.3;
-        }
-      }
-
-      const idx = nearestTrackIndex(kart.x, kart.y);
-      if (idx === 0 && kart.lastIndex > centerPoints.length - 3) {
-        kart.completedLaps += 1;
-        if (kart.completedLaps >= 3) {
-          raceOver = true;
-        }
-      }
-      kart.lastIndex = idx;
-    }
-
-    function updateHUD() {
-      lapText.textContent = `Lap ${Math.min(3, player.completedLaps + 1)}/3`;
-
-      const ranked = [...karts].sort((a, b) => {
-        if (b.completedLaps !== a.completedLaps) return b.completedLaps - a.completedLaps;
-        return nearestTrackIndex(b.x, b.y) - nearestTrackIndex(a.x, a.y);
-      });
-      const pIndex = ranked.indexOf(player) + 1;
-      const suffix = pIndex === 1 ? 'st' : pIndex === 2 ? 'nd' : pIndex === 3 ? 'rd' : 'th';
-      posText.textContent = `${pIndex}${suffix}`;
-      speedText.textContent = String(Math.round(Math.hypot(player.vx, player.vy) * 22));
-
-      if (player.item) {
-        const map = {
-          mushroom: ['🍄', 'Mushroom'],
-          banana: ['🍌', 'Banana'],
-          redshell: ['🔴', 'Red Shell']
-        };
-        const [emoji, label] = map[player.item];
-        itemEmoji.textContent = emoji;
-        itemText.textContent = label;
-      } else {
-        itemEmoji.textContent = '❔';
-        itemText.textContent = 'No Item';
-      }
-    }
-
-    function drawGrid() {
-      ctx.fillStyle = '#0d1b22';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = '#143226';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      for (let x = 0; x < canvas.width; x += 40) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
-      for (let y = 0; y < canvas.height; y += 40) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-      }
-    }
-
-    function drawTrack() {
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-
-      ctx.beginPath();
-      ctx.moveTo(trackPoints[0].x, trackPoints[0].y);
-      for (let i = 1; i < trackPoints.length; i++) {
-        ctx.lineTo(trackPoints[i].x, trackPoints[i].y);
-      }
-      ctx.closePath();
-
-      ctx.strokeStyle = '#2a343d';
-      ctx.lineWidth = 86;
-      ctx.stroke();
-
-      ctx.strokeStyle = '#4d5966';
-      ctx.lineWidth = 66;
-      ctx.stroke();
-
-      ctx.strokeStyle = '#d8dfe7';
-      ctx.setLineDash([18, 18]);
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    function drawItemBoxes() {
-      for (const item of itemSpawns) {
-        if (!item.active) continue;
-        const pulse = 1 + Math.sin(Date.now() * 0.006 + item.x) * 0.15;
-        ctx.save();
-        ctx.translate(item.x, item.y);
-        ctx.scale(pulse, pulse);
-        ctx.fillStyle = 'rgba(255, 220, 90, 0.95)';
-        ctx.fillRect(-10, -10, 20, 20);
-        ctx.fillStyle = '#f9ffef';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(item.kind === 'mushroom' ? 'M' : item.kind === 'banana' ? 'B' : 'S', 0, 2);
-        ctx.restore();
-      }
-    }
-
-    function drawBananas() {
-      for (const b of activeBananas) {
-        ctx.save();
-        ctx.translate(b.x, b.y);
-        ctx.rotate(Math.PI / 2);
-        ctx.fillStyle = '#ffde4d';
-        ctx.fillRect(-8, -14, 16, 28);
-        ctx.restore();
-      }
-    }
-
-    function drawShells() {
-      for (const s of activeShells) {
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
-        ctx.fillStyle = '#ff4d4d';
-        ctx.fill();
-      }
-    }
-
-    function drawKart(kart) {
-      ctx.save();
-      ctx.translate(kart.x, kart.y);
-      ctx.rotate(kart.angle);
-
-      ctx.fillStyle = kart.color;
-      ctx.fillRect(-16, -10, 32, 20);
-      ctx.fillStyle = '#dfeeff';
-      ctx.fillRect(-8, -12, 16, 8);
-
-      ctx.fillStyle = '#111';
-      ctx.fillRect(-18, -14, 6, 10);
-      ctx.fillRect(12, -14, 6, 10);
-      ctx.fillRect(-18, 4, 6, 10);
-      ctx.fillRect(12, 4, 6, 10);
-
-      ctx.restore();
-    }
-
-    function draw() {
-      drawGrid();
-      drawTrack();
-      drawItemBoxes();
-      drawBananas();
-      drawShells();
-      drawKart(player);
-      for (const bot of [botA, botB, botC]) drawKart(bot);
-    }
-
-    let last = performance.now();
-    function loop(now) {
-      const dt = Math.min((now - last) / 1000, 0.032);
-      last = now;
-
-      if (!raceOver) {
-        updateKartLogic(player, dt);
-        updateKartLogic(botA, dt);
-        updateKartLogic(botB, dt);
-        updateKartLogic(botC, dt);
-        updateItems(dt);
-        if (player.completedLaps >= 3) {
-          raceOver = true;
-          messageEl.textContent = 'Winner: PLAYER';
-          messageEl.classList.add('show');
-        }
-      }
-
-      updateHUD();
-      draw();
-      requestAnimationFrame(loop);
-    }
-
-    player.angle = -Math.PI / 2;
-    botA.angle = -0.3;
-    botB.angle = 1.0;
-    botC.angle = 2.0;
-
-    canvas.focus();
-    requestAnimationFrame(loop);
+    resetGame();
+    requestAnimationFrame(animate);
   </script>
 </body>
 </html>
