@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canva Kart Racer</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #040810;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      position: relative;
+    }
+
+    #game-root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #060c19;
+    }
+
+    #hud {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      color: white;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+      user-select: none;
+    }
+
+    .panel {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      padding: 12px 16px;
+      background: rgba(12, 18, 30, 0.5);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 12px;
+      backdrop-filter: blur(2px);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 13px;
+    }
+
+    .panel .big {
+      font-size: 22px;
+      display: block;
+      margin-top: 4px;
+      letter-spacing: 0.04em;
+    }
+
+    #speedPanel {
+      position: absolute;
+      right: 22px;
+      top: 18px;
+      width: 170px;
+      padding: 12px 14px;
+      background: rgba(12, 18, 30, 0.5);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 12px;
+      text-align: right;
+    }
+
+    #speedLabel {
+      display: block;
+      font-size: 12px;
+      opacity: 0.8;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    #speedValue {
+      display: block;
+      font-size: 30px;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    #itemPanel {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 22px;
+      min-width: 160px;
+      text-align: center;
+      padding: 12px 16px;
+      background: rgba(12, 18, 30, 0.55);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 14px;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    #itemEmoji {
+      display: block;
+      font-size: 30px;
+      margin-bottom: 4px;
+    }
+
+    #message {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 18px 20px;
+      white-space: nowrap;
+    }
+
+    #message.show {
+      opacity: 1;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js"></script>
+</head>
+<body>
+  <div id="game-root"></div>
+
+  <div id="hud">
+    <div class="panel">
+      <span>Lap</span>
+      <span id="lapText" class="big">Lap 1/3</span>
+    </div>
+
+    <div class="panel" style="top: 110px; width: 150px;">
+      <span>Position</span>
+      <span id="positionText" class="big">1st</span>
+    </div>
+
+    <div id="speedPanel">
+      <span id="speedLabel">Speed</span>
+      <span id="speedValue">0</span>
+    </div>
+
+    <div id="itemPanel">
+      <span id="itemEmoji">❔</span>
+      <span id="itemText">No Item</span>
+    </div>
+
+    <div id="message">Race Over</div>
+  </div>
+
+  <script>
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const mount = document.getElementById('game-root');
+    mount.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x7ec8ff);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 12, 22);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
+
+    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+    sun.position.set(20, 30, 10);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -80;
+    sun.shadow.camera.right = 80;
+    sun.shadow.camera.top = 80;
+    sun.shadow.camera.bottom = -80;
+    scene.add(sun);
+
+    const worldRadius = 85;
+    const splinePoints = [
+      new THREE.Vector3(-10, 0.2, -35),
+      new THREE.Vector3(18, 0.5, -42),
+      new THREE.Vector3(36, 0.2, -24),
+      new THREE.Vector3(46, 0.8, 4),
+      new THREE.Vector3(34, 0.4, 33),
+      new THREE.Vector3(8, 0.2, 46),
+      new THREE.Vector3(-15, 0.1, 38),
+      new THREE.Vector3(-40, 0.6, 24),
+      new THREE.Vector3(-52, 0.3, -2),
+      new THREE.Vector3(-40, 0.7, -30),
+      new THREE.Vector3(-18, 0.4, -42),
+      new THREE.Vector3(-5, 0.2, -33)
+    ];
+
+    const trackCurve = new THREE.CatmullRomCurve3(splinePoints, true, 'catmullrom', 0.2);
+    const trackRadius = 8.5;
+    const tubeSegments = 420;
+    const tubeRadius = trackRadius;
+    const trackGeometry = new THREE.TubeGeometry(trackCurve, tubeSegments, tubeRadius, 16, true);
+
+    const asphaltCanvas = document.createElement('canvas');
+    asphaltCanvas.width = 512;
+    asphaltCanvas.height = 512;
+    const asphaltCtx = asphaltCanvas.getContext('2d');
+    asphaltCtx.fillStyle = '#303640';
+    asphaltCtx.fillRect(0, 0, 512, 512);
+    asphaltCtx.strokeStyle = '#525d6d';
+    asphaltCtx.lineWidth = 8;
+    for (let i = 0; i < 16; i++) {
+      asphaltCtx.beginPath();
+      asphaltCtx.moveTo(0, i * 32);
+      asphaltCtx.lineTo(512, i * 32);
+      asphaltCtx.stroke();
+    }
+    asphaltCtx.strokeStyle = '#f7f7f7';
+    asphaltCtx.lineWidth = 4;
+    for (let i = 0; i < 16; i++) {
+      asphaltCtx.beginPath();
+      asphaltCtx.moveTo(0, i * 32 + 16);
+      asphaltCtx.lineTo(512, i * 32 + 16);
+      asphaltCtx.stroke();
+    }
+
+    const asphaltTexture = new THREE.CanvasTexture(asphaltCanvas);
+    asphaltTexture.wrapS = THREE.RepeatWrapping;
+    asphaltTexture.wrapT = THREE.RepeatWrapping;
+    asphaltTexture.repeat.set(8, 8);
+
+    const trackMaterial = new THREE.MeshStandardMaterial({
+      map: asphaltTexture,
+      roughness: 0.9,
+      metalness: 0.1,
+      color: 0xffffff
+    });
+
+    const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
+    trackMesh.receiveShadow = true;
+    trackMesh.castShadow = false;
+    scene.add(trackMesh);
+
+    const terrain = new THREE.Mesh(
+      new THREE.PlaneGeometry(220, 220, 1, 1),
+      new THREE.MeshStandardMaterial({ color: 0x2e9d4a, roughness: 1 })
+    );
+    terrain.rotation.x = -Math.PI / 2;
+    terrain.position.y = -0.2;
+    terrain.receiveShadow = true;
+    scene.add(terrain);
+
+    const skyRadius = 500;
+    const skyGeo = new THREE.SphereGeometry(skyRadius, 32, 32);
+    const skyMat = new THREE.MeshBasicMaterial({
+      color: 0x7ec8ff,
+      side: THREE.BackSide
+    });
+    const sky = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(sky);
+
+    const hud = document.getElementById('hud');
+    const lapText = document.getElementById('lapText');
+    const positionText = document.getElementById('positionText');
+    const speedValue = document.getElementById('speedValue');
+    const itemEmoji = document.getElementById('itemEmoji');
+    const itemText = document.getElementById('itemText');
+    const messageEl = document.getElementById('message');
+
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (raceState.raceOver === false) {
+          usePlayerItem();
+        }
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    function createKart(color, x, z, name) {
+      const group = new THREE.Group();
+
+      const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.2 });
+      const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 4.4), bodyMat);
+      chassis.castShadow = true;
+      chassis.position.y = 1.05;
+      group.add(chassis);
+
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.9, 2.1), new THREE.MeshStandardMaterial({ color: 0xe8f3ff, roughness: 0.4, metalness: 0.2 }));
+      cabin.castShadow = true;
+      cabin.position.set(0, 1.7, -0.2);
+      group.add(cabin);
+
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1 });
+      const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.65, 16);
+      const wheelPositions = [
+        [-1.15, 0.55, 1.55],
+        [1.15, 0.55, 1.55],
+        [-1.15, 0.55, -1.55],
+        [1.15, 0.55, -1.55]
+      ];
+
+      const wheels = [];
+      wheelPositions.forEach(([xpos, ypos, zpos]) => {
+        const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(xpos, ypos, zpos);
+        wheel.castShadow = true;
+        wheel.receiveShadow = true;
+        group.add(wheel);
+        wheels.push(wheel);
+      });
+
+      group.position.set(x, 0, z);
+      group.rotation.y = 0;
+      scene.add(group);
+
+      return {
+        name,
+        group,
+        color,
+        wheels,
+        position: group.position,
+        velocity: 0,
+        acceleration: 0.15,
+        maxSpeed: 5.0,
+        braking: 0.3,
+        friction: 0.05,
+        turnSpeed: 0.04,
+        angle: 0,
+        stallTimer: 0,
+        spinTimer: 0,
+        item: null,
+        itemTimer: 0,
+        lap: 1,
+        lapProgress: 0,
+        lastWaypoint: 0,
+        totalWaypoints: 0,
+        place: 1,
+        isPlayer: name === 'player',
+        isBot: name !== 'player',
+        botTargetIndex: 0,
+        botTimer: Math.random() * 0.8,
+        radius: 3,
+        activeBanana: null,
+        shell: null,
+        shellTimer: 0,
+        raceFinished: false,
+        currentLap: 1,
+        completedLaps: 0,
+        winnerPlaced: false,
+        lastSafePosition: new THREE.Vector3(x, 0, z)
+      };
+    }
+
+    const player = createKart(0x51d5ff, 0, 0, 'player');
+    const botA = createKart(0xff8a5b, 8, 6, 'botA');
+    const botB = createKart(0x92d050, -10, 12, 'botB');
+    const botC = createKart(0xffd166, 4, -10, 'botC');
+
+    const karts = [player, botA, botB, botC];
+
+    function setKartAngle(kart, angle) {
+      kart.angle = angle;
+      kart.group.rotation.y = angle;
+    }
+
+    function getKartForward(kart) {
+      return new THREE.Vector3(Math.sin(kart.angle), 0, Math.cos(kart.angle));
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function nearestTrackPoint(worldPos) {
+      let best = null;
+      let bestDistSq = Infinity;
+      const sampleCount = 400;
+      for (let i = 0; i <= sampleCount; i++) {
+        const t = i / sampleCount;
+        const p = trackCurve.getPointAt(t);
+        const dx = p.x - worldPos.x;
+        const dz = p.z - worldPos.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          best = p;
+        }
+      }
+      return best;
+    }
+
+    function distanceToTrack(worldPos) {
+      const point = nearestTrackPoint(worldPos);
+      if (!point) return 999;
+      const dx = point.x - worldPos.x;
+      const dz = point.z - worldPos.z;
+      return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    function trackProgressForPos(pos) {
+      let bestT = 0;
+      let bestDist = Infinity;
+      const sampleCount = 500;
+      for (let i = 0; i <= sampleCount; i++) {
+        const t = i / sampleCount;
+        const p = trackCurve.getPointAt(t);
+        const dx = p.x - pos.x;
+        const dz = p.z - pos.z;
+        const dist = dx * dx + dz * dz;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestT = t;
+        }
+      }
+      return bestT;
+    }
+
+    function updateKartProgress(kart) {
+      const t = trackProgressForPos(kart.position);
+      const waypointCount = splinePoints.length;
+      const idx = Math.floor(t * waypointCount);
+      const altIdx = idx % waypointCount;
+
+      if (altIdx === 0 && kart.lastWaypoint > waypointCount - 3) {
+        if (kart.totalWaypoints >= waypointCount) {
+          kart.totalWaypoints = 0;
+          kart.completedLaps += 1;
+          kart.currentLap = Math.min(3, kart.completedLaps + 1);
+          if (kart.completedLaps >= 3) {
+            kart.raceFinished = true;
+          }
+        }
+      }
+
+      kart.lastWaypoint = altIdx;
+      kart.totalWaypoints = Math.max(kart.totalWaypoints, altIdx);
+    }
+
+    const itemBoxes = [];
+    const itemBoxData = [
+      { pos: new THREE.Vector3(-8, 1.5, -18), kind: 'mushroom' },
+      { pos: new THREE.Vector3(26, 1.5, -18), kind: 'banana' },
+      { pos: new THREE.Vector3(22, 1.5, 16), kind: 'redshell' },
+      { pos: new THREE.Vector3(-30, 1.5, 12), kind: 'mushroom' }
+    ];
+
+    function createItemBox(position, kind) {
+      const group = new THREE.Group();
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1.4, 1.4, 1.4),
+        new THREE.MeshStandardMaterial({
+          color: 0xFFE066,
+          emissive: 0xFFC300,
+          emissiveIntensity: 0.9,
+          transparent: true,
+          opacity: 0.85
+        })
+      );
+      mesh.castShadow = true;
+      group.add(mesh);
+      group.position.copy(position);
+      scene.add(group);
+      return {
+        kind,
+        group,
+        mesh,
+        active: true,
+        respawnTimer: 0,
+        bob: Math.random() * Math.PI * 2
+      };
+    }
+
+    itemBoxData.forEach((entry) => {
+      itemBoxes.push(createItemBox(entry.pos, entry.kind));
+    });
+
+    function resetItemBox(itemBox) {
+      itemBox.active = true;
+      itemBox.respawnTimer = 0;
+      itemBox.group.visible = true;
+      itemBox.group.position.y = 1.5;
+      itemBox.mesh.material.opacity = 0.85;
+    }
+
+    function updateItemBoxes(delta) {
+      itemBoxes.forEach((box) => {
+        if (!box.active) {
+          box.respawnTimer -= delta;
+          if (box.respawnTimer <= 0) {
+            resetItemBox(box);
+          }
+          return;
+        }
+
+        box.bob += delta * 2.2;
+        box.group.position.y = 1.5 + Math.sin(box.bob) * 0.5;
+        box.group.rotation.y += delta * 1.4;
+        box.group.rotation.x += delta * 0.9;
+
+        karts.forEach((kart) => {
+          const dist = kart.position.distanceTo(box.group.position);
+          if (dist < 2.5) {
+            box.active = false;
+            box.group.visible = false;
+            box.respawnTimer = 5;
+            if (kart.item == null) {
+              kart.item = box.kind;
+            }
+          }
+        });
+      });
+    }
+
+    const raceState = {
+      raceOver: false,
+      winner: null,
+      finalPlacements: []
+    };
+
+    function updateHUD() {
+      const position = Math.min(4, karts.filter((k) => k.completedLaps > 0 || k.position.x !== 0 || k.position.z !== 0).length);
+      if (player.completedLaps >= 3 || player.raceFinished) {
+        positionText.textContent = '1st';
+      } else {
+        const ranked = [...karts].sort((a, b) => b.completedLaps - a.completedLaps || b.totalWaypoints - a.totalWaypoints);
+        const index = ranked.findIndex((k) => k === player);
+        const pos = index + 1;
+        positionText.textContent = `${pos}${pos === 1 ? 'st' : pos === 2 ? 'nd' : pos === 3 ? 'rd' : 'th'}`;
+      }
+
+      lapText.textContent = `Lap ${Math.min(3, Math.max(1, player.completedLaps + 1))}/3`;
+      speedValue.textContent = String(Math.round(Math.abs(player.velocity) * 35));
+
+      if (player.item) {
+        const itemMap = {
+          mushroom: { emoji: '🍄', label: 'Mushroom' },
+          banana: { emoji: '🍌', label: 'Banana' },
+          redshell: { emoji: '🔴', label: 'Red Shell' }
+        };
+        const item = itemMap[player.item];
+        itemEmoji.textContent = item.emoji;
+        itemText.textContent = item.label;
+      } else {
+        itemEmoji.textContent = '❔';
+        itemText.textContent = 'No Item';
+      }
+    }
+
+    function updateRacePlacements() {
+      const standings = [...karts].sort((a, b) => {
+        if (b.completedLaps !== a.completedLaps) return b.completedLaps - a.completedLaps;
+        return b.totalWaypoints - a.totalWaypoints;
+      });
+
+      standings.forEach((kart, idx) => {
+        kart.place = idx + 1;
+      });
+
+      if (standings[0] && standings[0].completedLaps >= 3 && !raceState.raceOver) {
+        raceState.raceOver = true;
+        raceState.winner = standings[0];
+        messageEl.textContent = `Winner: ${raceState.winner.name.toUpperCase()}`;
+        messageEl.classList.add('show');
+      }
+    }
+
+    function applyPlayerControls(kart, delta) {
+      const turnDir = (keys['arrowleft'] || keys['a'] ? -1 : 0) + (keys['arrowright'] || keys['d'] ? 1 : 0);
+      const forward = keys['arrowup'] || keys['w'];
+      const reverse = keys['arrowdown'] || keys['s'];
+
+      if (kart.stallTimer > 0) {
+        kart.stallTimer -= delta;
+        kart.velocity *= 0.97;
+      }
+
+      if (turnDir !== 0) {
+        kart.angle += turnDir * kart.turnSpeed * (0.5 + Math.abs(kart.velocity) * 0.25);
+      }
+
+      if (forward) {
+        kart.velocity += kart.acceleration * (1 + (kart.item === 'mushroom' ? 0.8 : 0));
+      }
+
+      if (reverse) {
+        kart.velocity -= kart.braking * 0.8;
+      }
+
+      kart.velocity *= 1 - kart.friction;
+      kart.velocity = clamp(kart.velocity, -2.8, kart.item === 'mushroom' ? kart.maxSpeed * 1.8 : kart.maxSpeed);
+
+      const moveX = Math.sin(kart.angle) * kart.velocity;
+      const moveZ = Math.cos(kart.angle) * kart.velocity;
+      kart.position.x += moveX * delta * 60;
+      kart.position.z += moveZ * delta * 60;
+
+      if (Math.abs(kart.velocity) < 0.02) {
+        kart.velocity = 0;
+      }
+
+      const safePos = nearestTrackPoint(kart.position);
+      if (safePos) {
+        const dist = kart.position.distanceTo(safePos);
+        if (dist > trackRadius + 1.3) {
+          const direction = safePos.clone().sub(kart.position).normalize();
+          kart.position.addScaledVector(direction, (dist - trackRadius) * 0.6);
+          kart.velocity *= 0.5;
+        }
+      }
+
+      if (kart.position.length() > 120) {
+        kart.position.copy(kart.lastSafePosition);
+      }
+
+      kart.lastSafePosition.copy(kart.position);
+      setKartAngle(kart, kart.angle);
+      kart.group.position.set(kart.position.x, 0, kart.position.z);
+      kart.group.position.y = 0;
+    }
+
+    function moveBot(kart, delta) {
+      kart.botTimer -= delta;
+      if (kart.botTimer > 0) return;
+      kart.botTimer = 0.18 + Math.random() * 0.18;
+
+      const target = splinePoints[kart.botTargetIndex % splinePoints.length];
+      const dx = target.x - kart.position.x;
+      const dz = target.z - kart.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      if (dist < 8) {
+        kart.botTargetIndex = (kart.botTargetIndex + 1) % splinePoints.length;
+      }
+
+      const desiredAngle = Math.atan2(dx, dz);
+      const diff = (desiredAngle - kart.angle + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+      kart.angle += diff * 0.04;
+
+      kart.velocity += kart.acceleration * 0.6;
+      kart.velocity = clamp(kart.velocity, 0, kart.maxSpeed * (kart.item === 'mushroom' ? 1.8 : 1));
+      kart.velocity *= 1 - kart.friction * 0.7;
+
+      const moveX = Math.sin(kart.angle) * kart.velocity;
+      const moveZ = Math.cos(kart.angle) * kart.velocity;
+      kart.position.x += moveX * delta * 60;
+      kart.position.z += moveZ * delta * 60;
+
+      const safePos = nearestTrackPoint(kart.position);
+      if (safePos) {
+        const distToTrack = kart.position.distanceTo(safePos);
+        if (distToTrack > trackRadius + 1.5) {
+          const dir = safePos.clone().sub(kart.position).normalize();
+          kart.position.addScaledVector(dir, (distToTrack - trackRadius) * 0.8);
+          kart.velocity *= 0.6;
+        }
+      }
+
+      setKartAngle(kart, kart.angle);
+      kart.group.position.set(kart.position.x, 0, kart.position.z);
+
+      if (Math.random() < 0.002 && kart.item === null) {
+        const itemChoices = ['mushroom', 'banana', 'redshell'];
+        kart.item = itemChoices[Math.floor(Math.random() * itemChoices.length)];
+      }
+
+      if (kart.item && Math.random() < 0.008) {
+        useKartItem(kart);
+      }
+    }
+
+    function createBanana(kart) {
+      const banana = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.4, 0.5, 1.6, 12),
+        new THREE.MeshStandardMaterial({ color: 0xffd54d, emissive: 0xffb300, emissiveIntensity: 0.3 })
+      );
+      banana.rotation.z = Math.PI / 2;
+      banana.castShadow = true;
+      banana.receiveShadow = true;
+      banana.position.copy(kart.position).add(new THREE.Vector3(Math.sin(kart.angle) * -2.6, 0.2, Math.cos(kart.angle) * -2.6));
+      scene.add(banana);
+      return {
+        mesh: banana,
+        owner: kart,
+        active: true,
+        life: 6,
+        radius: 2.2,
+        timer: 0
+      };
+    }
+
+    function createShell(kart, target) {
+      const shell = new THREE.Mesh(
+        new THREE.SphereGeometry(0.6, 18, 18),
+        new THREE.MeshStandardMaterial({ color: 0xff3b3b, emissive: 0x7a0000, emissiveIntensity: 0.7 })
+      );
+      shell.castShadow = true;
+      shell.position.copy(kart.position).add(new THREE.Vector3(0, 0.8, 0));
+      scene.add(shell);
+      return {
+        mesh: shell,
+        owner: kart,
+        target,
+        active: true,
+        speed: 0.3,
+        life: 6,
+        radius: 1.4
+      };
+    }
+
+    const activeBananas = [];
+    const activeShells = [];
+
+    function triggerBanana(kart) {
+      if (kart.item !== 'banana') return;
+      const banana = createBanana(kart);
+      activeBananas.push(banana);
+      kart.item = null;
+    }
+
+    function triggerShell(kart) {
+      if (kart.item !== 'redshell') return;
+      const target = [...karts].filter((k) => k !== kart).sort((a, b) => {
+        const aDist = a.position.distanceTo(kart.position);
+        const bDist = b.position.distanceTo(kart.position);
+        return aDist - bDist;
+      })[0];
+      if (!target) return;
+
+      const shell = createShell(kart, target);
+      activeShells.push(shell);
+      kart.item = null;
+    }
+
+    function useKartItem(kart) {
+      if (kart.item === 'mushroom') {
+        kart.maxSpeed = 5.0 * 1.8;
+        kart.itemTimer = 1.5;
+        kart.item = null;
+      } else if (kart.item === 'banana') {
+        triggerBanana(kart);
+      } else if (kart.item === 'redshell') {
+        triggerShell(kart);
+      }
+    }
+
+    function usePlayerItem() {
+      if (raceState.raceOver) return;
+      if (!player.item) return;
+      if (player.item === 'mushroom') {
+        player.maxSpeed = 5.0 * 1.8;
+        player.itemTimer = 1.5;
+        player.item = null;
+      } else if (player.item === 'banana') {
+        triggerBanana(player);
+      } else if (player.item === 'redshell') {
+        triggerShell(player);
+      }
+    }
+
+    function updateItemEffects(delta) {
+      karts.forEach((kart) => {
+        if (kart.itemTimer > 0) {
+          kart.itemTimer -= delta;
+          if (kart.itemTimer <= 0) {
+            kart.maxSpeed = 5.0;
+          }
+        }
+
+        if (kart.spinTimer > 0) {
+          kart.spinTimer -= delta;
+          kart.group.rotation.y += delta * 18;
+          kart.velocity *= 0.9;
+          if (kart.spinTimer <= 0) {
+            kart.velocity = 0;
+          }
+        }
+
+        if (kart.stallTimer > 0) {
+          kart.stallTimer -= delta;
+        }
+      });
+
+      activeBananas.forEach((banana) => {
+        banana.life -= delta;
+        if (banana.life <= 0) {
+          scene.remove(banana.mesh);
+          banana.active = false;
+          return;
+        }
+
+        karts.forEach((kart) => {
+          if (kart === banana.owner) return;
+          const dist = kart.position.distanceTo(banana.mesh.position);
+          if (dist < banana.radius) {
+            kart.spinTimer = 1;
+            kart.velocity = 0;
+            kart.group.rotation.y += Math.PI * 2;
+            scene.remove(banana.mesh);
+            banana.active = false;
+          }
+        });
+      });
+
+      activeShells.forEach((shell) => {
+        shell.life -= delta;
+        if (!shell.active || shell.life <= 0) {
+          scene.remove(shell.mesh);
+          return;
+        }
+
+        const targetPos = shell.target.position.clone();
+        const dir = targetPos.sub(shell.mesh.position).normalize();
+        shell.mesh.position.addScaledVector(dir, 0.48);
+        shell.mesh.position.y = 0.8;
+
+        karts.forEach((kart) => {
+          if (kart === shell.owner) return;
+          if (shell.mesh.position.distanceTo(kart.position) < 1.8) {
+            kart.spinTimer = 1.5;
+            kart.velocity = 0;
+            kart.group.rotation.y += Math.PI * 2;
+            scene.remove(shell.mesh);
+            shell.active = false;
+          }
+        });
+      });
+
+      activeBananas.splice(0, activeBananas.filter((b) => !b.active).length);
+      activeShells.splice(0, activeShells.filter((s) => !s.active).length);
+    }
+
+    function kartToKartCollision() {
+      for (let i = 0; i < karts.length; i++) {
+        for (let j = i + 1; j < karts.length; j++) {
+          const a = karts[i];
+          const b = karts[j];
+          const dx = b.position.x - a.position.x;
+          const dz = b.position.z - a.position.z;
+          const distSq = dx * dx + dz * dz;
+          const minDist = a.radius + b.radius;
+
+          if (distSq < minDist * minDist) {
+            const dist = Math.sqrt(distSq) || 0.0001;
+            const nx = dx / dist;
+            const nz = dz / dist;
+            const overlap = (minDist - dist) * 0.5;
+
+            a.position.x -= nx * overlap;
+            a.position.z -= nz * overlap;
+            b.position.x += nx * overlap;
+            b.position.z += nz * overlap;
+
+            const relVelA = a.velocity;
+            const relVelB = b.velocity;
+            const impulse = (relVelA - relVelB) * 0.5;
+            a.velocity -= impulse;
+            b.velocity += impulse;
+          }
+        }
+      }
+    }
+
+    const clock = new THREE.Clock();
+
+    function renderFrame() {
+      const delta = Math.min(clock.getDelta(), 0.033);
+
+      if (!raceState.raceOver) {
+        applyPlayerControls(player, delta);
+        moveBot(botA, delta);
+        moveBot(botB, delta);
+        moveBot(botC, delta);
+        kartToKartCollision();
+
+        karts.forEach((kart) => {
+          const closest = nearestTrackPoint(kart.position);
+          if (closest) {
+            const offTrack = kart.position.distanceTo(closest);
+            if (offTrack > trackRadius + 1.2) {
+              const dir = closest.clone().sub(kart.position).normalize();
+              kart.position.addScaledVector(dir, (offTrack - trackRadius) * 0.7);
+              kart.velocity *= 0.5;
+            }
+          }
+
+          kart.position.y = 0;
+          kart.group.position.set(kart.position.x, 0, kart.position.z);
+          kart.group.rotation.y = kart.angle;
+          updateKartProgress(kart);
+
+          if (kart.completedLaps >= 3 && !kart.raceFinished) {
+            kart.raceFinished = true;
+          }
+        });
+
+        updateItemEffects(delta);
+        updateItemBoxes(delta);
+        updateRacePlacements();
+      }
+
+      updateHUD();
+
+      const desiredPos = player.position.clone().add(new THREE.Vector3(
+        -Math.sin(player.angle) * 15,
+        6,
+        -Math.cos(player.angle) * 15
+      ));
+
+      camera.position.lerp(desiredPos, 0.08);
+      camera.lookAt(player.position.x, 1.5, player.position.z);
+
+      karts.forEach((kart) => {
+        const wheelRot = kart.velocity * 1.4;
+        kart.wheels.forEach((wheel) => {
+          wheel.rotation.x += wheelRot * delta * 55;
+        });
+      });
+
+      activeBananas.forEach((banana) => {
+        banana.mesh.rotation.x += delta * 2;
+      });
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(renderFrame);
+    }
+
+    function resizeRenderer() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    }
+
+    window.addEventListener('resize', resizeRenderer);
+    resizeRenderer();
+
+    setKartAngle(player, 0);
+    setKartAngle(botA, Math.PI * 0.3);
+    setKartAngle(botB, Math.PI * 1.2);
+    setKartAngle(botC, -Math.PI * 0.7);
+
+    botA.position.set(12, 0, -36);
+    botB.position.set(-8, 0, 30);
+    botC.position.set(26, 0, 10);
+
+    player.group.position.set(0, 0, 0);
+    botA.group.position.copy(botA.position);
+    botB.group.position.copy(botB.position);
+    botC.group.position.copy(botC.position);
+
+    requestAnimationFrame(renderFrame);
+  </script>
+</body>
+</html>
