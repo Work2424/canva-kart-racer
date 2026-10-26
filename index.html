@@ -19,6 +19,7 @@
       width: 100%;
       height: 100%;
       background: #07131c;
+      outline: none;
     }
 
     #hud {
@@ -123,6 +124,10 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
+    canvas.tabIndex = 0;
+    canvas.addEventListener('mousedown', () => canvas.focus());
+    canvas.addEventListener('touchstart', () => canvas.focus(), { passive: true });
+
     const lapText = document.getElementById('lapText');
     const posText = document.getElementById('posText');
     const speedText = document.getElementById('speedText');
@@ -138,17 +143,23 @@
     resizeCanvas();
 
     const keys = {};
+
+    function setKeyState(code, pressed) {
+      if (!code) return;
+      const key = code.toLowerCase();
+      keys[key] = pressed;
+    }
+
     window.addEventListener('keydown', (e) => {
-      const k = e.key.toLowerCase();
-      keys[k] = true;
+      setKeyState(e.key, true);
       if (e.code === 'Space') {
         e.preventDefault();
         usePlayerItem();
       }
     });
+
     window.addEventListener('keyup', (e) => {
-      const k = e.key.toLowerCase();
-      keys[k] = false;
+      setKeyState(e.key, false);
     });
 
     const trackPoints = [
@@ -222,18 +233,13 @@
         accel: 0.2,
         friction: 0.045,
         turnSpeed: 0.06,
-        drift: 0,
         item: null,
         itemTimer: 0,
-        lap: 1,
-        lapProgress: 0,
-        lastIndex: 0,
         completedLaps: 0,
         spinTimer: 0,
         radius: 16,
         boostTimer: 0,
-        shell: null,
-        banana: null
+        lastIndex: 0
       };
     }
 
@@ -254,11 +260,6 @@
 
     const activeBananas = [];
     const activeShells = [];
-
-    function resetItemBox(item) {
-      item.active = true;
-      item.respawn = 0;
-    }
 
     function updateItems(dt) {
       for (const it of itemSpawns) {
@@ -372,8 +373,10 @@
           kart.angle += steer * kart.turnSpeed * 1.2;
         }
 
-        if (forward) kart.vx += Math.cos(kart.angle) * kart.accel;
-        if (forward) kart.vy += Math.sin(kart.angle) * kart.accel;
+        if (forward) {
+          kart.vx += Math.cos(kart.angle) * kart.accel;
+          kart.vy += Math.sin(kart.angle) * kart.accel;
+        }
         if (backward) {
           kart.vx -= Math.cos(kart.angle) * kart.accel * 0.8;
           kart.vy -= Math.sin(kart.angle) * kart.accel * 0.8;
@@ -632,6 +635,7 @@
     botB.angle = 1.0;
     botC.angle = 2.0;
 
+    canvas.focus();
     requestAnimationFrame(loop);
   </script>
 </body>
